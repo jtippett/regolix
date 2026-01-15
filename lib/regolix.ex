@@ -136,6 +136,32 @@ defmodule Regolix do
   end
 
   @doc """
+  Clears all data from the engine, keeping policies intact.
+
+  ## Examples
+
+      {:ok, engine} = Regolix.clear_data(engine)
+  """
+  @spec clear_data(engine()) :: {:ok, engine()} | {:error, Error.t()}
+  def clear_data(engine) do
+    case Native.native_clear_data(engine) do
+      {:ok, {}} -> {:ok, engine}
+      {:error, {type, message}} -> {:error, %Error{type: type, message: message}}
+    end
+  end
+
+  @doc """
+  Clears all data from the engine. Raises on error.
+  """
+  @spec clear_data!(engine()) :: engine()
+  def clear_data!(engine) do
+    case clear_data(engine) do
+      {:ok, engine} -> engine
+      {:error, error} -> raise error
+    end
+  end
+
+  @doc """
   Evaluates a Rego query against the engine.
 
   Returns the result as Elixir terms, or `:undefined` if the query has no result.

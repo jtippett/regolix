@@ -271,4 +271,33 @@ defmodule RegolixTest do
       end
     end
   end
+
+  describe "clear_data/1" do
+    test "clears data but keeps policies" do
+      {:ok, engine} = Regolix.new()
+
+      {:ok, engine} =
+        Regolix.add_policy(engine, "test.rego", """
+        package test
+        result := data.config.value
+        """)
+
+      {:ok, engine} = Regolix.add_data(engine, %{"config" => %{"value" => 42}})
+      assert {:ok, 42} = Regolix.eval_query(engine, "data.test.result")
+
+      {:ok, engine} = Regolix.clear_data(engine)
+      assert {:ok, :undefined} = Regolix.eval_query(engine, "data.test.result")
+
+      # Verify policy still works after clear
+      assert "data.test" in Regolix.get_packages(engine)
+    end
+  end
+
+  describe "clear_data!/1" do
+    test "returns engine directly" do
+      engine = Regolix.new!()
+      engine = Regolix.clear_data!(engine)
+      assert is_reference(engine)
+    end
+  end
 end

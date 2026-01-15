@@ -19,4 +19,7 @@ defmodule Regolix.Native do
 
   @spec native_eval_query(reference(), String.t()) :: term() | {:error, {atom(), String.t()}}
   def native_eval_query(_engine, _query), do: :erlang.nif_error(:nif_not_loaded)
+
+  @spec native_clear_data(reference()) :: {:ok, {}} | {:error, {atom(), String.t()}}
+  def native_clear_data(_engine), do: :erlang.nif_error(:nif_not_loaded)
 end
