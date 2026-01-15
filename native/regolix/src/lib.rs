@@ -58,8 +58,7 @@ fn native_set_input(
     let value: regorus::Value = regorus::Value::from_json_str(&json_input)
         .map_err(|e| (atoms::json_error(), e.to_string()))?;
 
-    engine
-        .set_input(value);
+    engine.set_input(value);
 
     Ok(())
 }
@@ -78,4 +77,12 @@ fn native_get_packages(
         .map_err(|e| (atoms::engine_error(), e.to_string()))
 }
 
-rustler::init!("Elixir.Regolix.Native", [native_new, native_add_policy, native_set_input, native_get_packages]);
+rustler::init!(
+    "Elixir.Regolix.Native",
+    [
+        native_new,
+        native_add_policy,
+        native_set_input,
+        native_get_packages
+    ]
+);
