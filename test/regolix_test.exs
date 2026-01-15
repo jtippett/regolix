@@ -148,8 +148,9 @@ defmodule RegolixTest do
 
     test "returns error for non-encodable data" do
       {:ok, engine} = Regolix.new()
+
       assert {:error, %Regolix.Error{type: :json_error}} =
-        Regolix.add_data(engine, %{"pid" => self()})
+               Regolix.add_data(engine, %{"pid" => self()})
     end
   end
 
@@ -162,6 +163,7 @@ defmodule RegolixTest do
 
     test "raises for non-encodable data" do
       engine = Regolix.new!()
+
       assert_raise Regolix.Error, ~r/json_error/, fn ->
         Regolix.add_data!(engine, %{"pid" => self()})
       end
@@ -223,23 +225,25 @@ defmodule RegolixTest do
     end
 
     test "verifies set_input actually sets input" do
-      engine = Regolix.new!()
-      |> Regolix.add_policy!("test.rego", """
+      engine =
+        Regolix.new!()
+        |> Regolix.add_policy!("test.rego", """
         package test
         username := input.user
         """)
-      |> Regolix.set_input!(%{"user" => "alice"})
+        |> Regolix.set_input!(%{"user" => "alice"})
 
       assert {:ok, "alice"} = Regolix.eval_query(engine, "data.test.username")
     end
 
     test "verifies add_data actually adds data" do
-      engine = Regolix.new!()
-      |> Regolix.add_policy!("test.rego", """
+      engine =
+        Regolix.new!()
+        |> Regolix.add_policy!("test.rego", """
         package test
         admin_role := data.users.alice.role
         """)
-      |> Regolix.add_data!(%{"users" => %{"alice" => %{"role" => "admin"}}})
+        |> Regolix.add_data!(%{"users" => %{"alice" => %{"role" => "admin"}}})
 
       assert {:ok, "admin"} = Regolix.eval_query(engine, "data.test.admin_role")
     end
@@ -298,6 +302,95 @@ defmodule RegolixTest do
       engine = Regolix.new!()
       engine = Regolix.clear_data!(engine)
       assert is_reference(engine)
+    end
+  end
+
+  describe "integration" do
+    test "complete authorization workflow" do
+      # Create engine and add policy
+      engine =
+        Regolix.new!()
+        |> Regolix.add_policy!("authz.rego", """
+        package authz
+
+        default allow = false
+
+        allow if {
+          input.method == "GET"
+          input.path == "/public"
+        }
+
+        allow if {
+          input.user.role == "admin"
+        }
+
+        allow if {
+          input.user.role == "viewer"
+          input.method == "GET"
+        }
+        """)
+
+      # Test public access
+      engine = Regolix.set_input!(engine, %{"method" => "GET", "path" => "/public"})
+      assert Regolix.eval_query!(engine, "data.authz.allow") == true
+
+      # Test admin access
+      engine = Regolix.set_input!(engine, %{"user" => %{"role" => "admin"}, "method" => "DELETE"})
+      assert Regolix.eval_query!(engine, "data.authz.allow") == true
+
+      # Test viewer read access
+      engine = Regolix.set_input!(engine, %{"user" => %{"role" => "viewer"}, "method" => "GET"})
+      assert Regolix.eval_query!(engine, "data.authz.allow") == true
+
+      # Test viewer write denied
+      engine = Regolix.set_input!(engine, %{"user" => %{"role" => "viewer"}, "method" => "POST"})
+      assert Regolix.eval_query!(engine, "data.authz.allow") == false
+    end
+
+    test "data-driven policy evaluation" do
+      engine =
+        Regolix.new!()
+        |> Regolix.add_policy!("rbac.rego", """
+        package rbac
+
+        default allow = false
+
+        allow if {
+          some permission in data.users[input.user_id].permissions
+          permission == input.permission
+        }
+        """)
+        |> Regolix.add_data!(%{
+          "users" => %{
+            "u1" => %{"name" => "Alice", "permissions" => ["read", "write"]},
+            "u2" => %{"name" => "Bob", "permissions" => ["read"]}
+          }
+        })
+
+      # Alice can write
+      engine = Regolix.set_input!(engine, %{"user_id" => "u1", "permission" => "write"})
+      assert Regolix.eval_query!(engine, "data.rbac.allow") == true
+
+      # Bob cannot write
+      engine = Regolix.set_input!(engine, %{"user_id" => "u2", "permission" => "write"})
+      assert Regolix.eval_query!(engine, "data.rbac.allow") == false
+
+      # Bob can read
+      engine = Regolix.set_input!(engine, %{"user_id" => "u2", "permission" => "read"})
+      assert Regolix.eval_query!(engine, "data.rbac.allow") == true
+    end
+
+    test "pipeline-style API" do
+      result =
+        Regolix.new!()
+        |> Regolix.add_policy!("calc.rego", """
+        package calc
+        doubled := input.value * 2
+        """)
+        |> Regolix.set_input!(%{"value" => 21})
+        |> Regolix.eval_query!("data.calc.doubled")
+
+      assert result == 42
     end
   end
 end
