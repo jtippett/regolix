@@ -45,4 +45,23 @@ fn native_add_policy(
         .map_err(|e| (atoms::parse_error(), e.to_string()))
 }
 
-rustler::init!("Elixir.Regolix.Native", [native_new, native_add_policy]);
+#[rustler::nif]
+fn native_set_input(
+    resource: ResourceArc<EngineResource>,
+    json_input: String,
+) -> Result<(), (Atom, String)> {
+    let mut engine = resource
+        .engine
+        .write()
+        .map_err(|e| (atoms::engine_error(), e.to_string()))?;
+
+    let value: regorus::Value = regorus::Value::from_json_str(&json_input)
+        .map_err(|e| (atoms::json_error(), e.to_string()))?;
+
+    engine
+        .set_input(value);
+
+    Ok(())
+}
+
+rustler::init!("Elixir.Regolix.Native", [native_new, native_add_policy, native_set_input]);
