@@ -54,4 +54,20 @@ defmodule Regolix do
       {:error, error} -> raise error
     end
   end
+
+  @doc """
+  Returns the list of package names loaded in the engine.
+
+  ## Examples
+
+      packages = Regolix.get_packages(engine)
+      # => ["data.authz", "data.rbac"]
+  """
+  @spec get_packages(engine()) :: [String.t()]
+  def get_packages(engine) do
+    case Native.native_get_packages(engine) do
+      {:ok, packages} -> packages
+      packages when is_list(packages) -> packages
+    end
+  end
 end

@@ -64,4 +64,18 @@ fn native_set_input(
     Ok(())
 }
 
-rustler::init!("Elixir.Regolix.Native", [native_new, native_add_policy, native_set_input]);
+#[rustler::nif]
+fn native_get_packages(
+    resource: ResourceArc<EngineResource>,
+) -> Result<Vec<String>, (Atom, String)> {
+    let engine = resource
+        .engine
+        .read()
+        .map_err(|e| (atoms::engine_error(), e.to_string()))?;
+
+    engine
+        .get_packages()
+        .map_err(|e| (atoms::engine_error(), e.to_string()))
+}
+
+rustler::init!("Elixir.Regolix.Native", [native_new, native_add_policy, native_set_input, native_get_packages]);
