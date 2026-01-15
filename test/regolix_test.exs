@@ -1,8 +1,17 @@
 defmodule RegolixTest do
   use ExUnit.Case
-  doctest Regolix
 
-  test "greets the world" do
-    assert Regolix.hello() == :world
+  describe "new/0" do
+    test "creates a new engine" do
+      assert {:ok, engine} = Regolix.new()
+      assert is_reference(engine)
+    end
+  end
+
+  describe "new!/0" do
+    test "returns engine directly" do
+      engine = Regolix.new!()
+      assert is_reference(engine)
+    end
   end
 end
