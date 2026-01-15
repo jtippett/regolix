@@ -3,7 +3,7 @@ defmodule Regolix do
   Elixir wrapper for the Regorus Rego policy engine.
   """
 
-  alias Regolix.Native
+  alias Regolix.{Error, Native}
 
   @type engine :: reference()
   @type json_encodable :: map() | list() | String.t() | number() | boolean() | nil
@@ -27,5 +27,31 @@ defmodule Regolix do
   @spec new!() :: engine()
   def new! do
     Native.native_new()
+  end
+
+  @doc """
+  Adds a Rego policy to the engine.
+
+  ## Examples
+
+      {:ok, engine} = Regolix.add_policy(engine, "authz.rego", "package authz")
+  """
+  @spec add_policy(engine(), String.t(), String.t()) :: {:ok, engine()} | {:error, Error.t()}
+  def add_policy(engine, name, source) do
+    case Native.native_add_policy(engine, name, source) do
+      {:ok, {}} -> {:ok, engine}
+      {:error, {type, message}} -> {:error, %Error{type: type, message: message}}
+    end
+  end
+
+  @doc """
+  Adds a Rego policy to the engine. Raises on error.
+  """
+  @spec add_policy!(engine(), String.t(), String.t()) :: engine()
+  def add_policy!(engine, name, source) do
+    case add_policy(engine, name, source) do
+      {:ok, engine} -> engine
+      {:error, error} -> raise error
+    end
   end
 end
