@@ -130,4 +130,41 @@ defmodule RegolixTest do
       end
     end
   end
+
+  describe "add_data/2" do
+    test "adds data document" do
+      {:ok, engine} = Regolix.new()
+
+      {:ok, engine} =
+        Regolix.add_data(engine, %{
+          "users" => %{
+            "alice" => %{"role" => "admin"},
+            "bob" => %{"role" => "viewer"}
+          }
+        })
+
+      assert is_reference(engine)
+    end
+
+    test "returns error for non-encodable data" do
+      {:ok, engine} = Regolix.new()
+      assert {:error, %Regolix.Error{type: :json_error}} =
+        Regolix.add_data(engine, %{"pid" => self()})
+    end
+  end
+
+  describe "add_data!/2" do
+    test "returns engine directly" do
+      engine = Regolix.new!()
+      engine = Regolix.add_data!(engine, %{"config" => %{"enabled" => true}})
+      assert is_reference(engine)
+    end
+
+    test "raises for non-encodable data" do
+      engine = Regolix.new!()
+      assert_raise Regolix.Error, ~r/json_error/, fn ->
+        Regolix.add_data!(engine, %{"pid" => self()})
+      end
+    end
+  end
 end

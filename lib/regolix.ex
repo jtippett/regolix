@@ -103,6 +103,38 @@ defmodule Regolix do
     end
   end
 
+  @doc """
+  Adds data to the engine's data document.
+
+  Can be called multiple times to merge data.
+
+  ## Examples
+
+      {:ok, engine} = Regolix.add_data(engine, %{"users" => %{"alice" => %{"role" => "admin"}}})
+  """
+  @spec add_data(engine(), json_encodable()) :: {:ok, engine()} | {:error, Error.t()}
+  def add_data(engine, data) do
+    with {:ok, json} <- encode_json(data),
+         {:ok, {}} <- Native.native_add_data(engine, json) do
+      {:ok, engine}
+    else
+      {:error, {type, message}} -> {:error, %Error{type: type, message: message}}
+      {:error, %Jason.EncodeError{} = e} -> {:error, %Error{type: :json_error, message: Exception.message(e)}}
+      {:error, %Protocol.UndefinedError{} = e} -> {:error, %Error{type: :json_error, message: Exception.message(e)}}
+    end
+  end
+
+  @doc """
+  Adds data to the engine. Raises on error.
+  """
+  @spec add_data!(engine(), json_encodable()) :: engine()
+  def add_data!(engine, data) do
+    case add_data(engine, data) do
+      {:ok, engine} -> engine
+      {:error, error} -> raise error
+    end
+  end
+
   defp encode_json(term) do
     Jason.encode(term)
   end
