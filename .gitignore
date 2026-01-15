@@ -28,3 +28,6 @@ regolix-*.tar
 
 # Compiled NIF binaries (generated during build)
 /priv/native/
+
+.private_journal/
+/.private-journal/
