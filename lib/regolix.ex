@@ -70,4 +70,40 @@ defmodule Regolix do
       packages when is_list(packages) -> packages
     end
   end
+
+  @doc """
+  Sets the input document for policy evaluation.
+
+  Accepts Elixir terms (maps, lists, etc.) which are automatically JSON-encoded.
+
+  ## Examples
+
+      {:ok, engine} = Regolix.set_input(engine, %{"user" => "alice"})
+  """
+  @spec set_input(engine(), json_encodable()) :: {:ok, engine()} | {:error, Error.t()}
+  def set_input(engine, input) do
+    with {:ok, json} <- encode_json(input),
+         {:ok, {}} <- Native.native_set_input(engine, json) do
+      {:ok, engine}
+    else
+      {:error, {type, message}} -> {:error, %Error{type: type, message: message}}
+      {:error, %Jason.EncodeError{} = e} -> {:error, %Error{type: :json_error, message: Exception.message(e)}}
+      {:error, %Protocol.UndefinedError{} = e} -> {:error, %Error{type: :json_error, message: Exception.message(e)}}
+    end
+  end
+
+  @doc """
+  Sets the input document. Raises on error.
+  """
+  @spec set_input!(engine(), json_encodable()) :: engine()
+  def set_input!(engine, input) do
+    case set_input(engine, input) do
+      {:ok, engine} -> engine
+      {:error, error} -> raise error
+    end
+  end
+
+  defp encode_json(term) do
+    Jason.encode(term)
+  end
 end

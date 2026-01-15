@@ -85,4 +85,49 @@ defmodule RegolixTest do
       assert "data.mypackage" in Regolix.get_packages(engine)
     end
   end
+
+  describe "set_input/2" do
+    test "sets input from Elixir map" do
+      {:ok, engine} = Regolix.new()
+      {:ok, engine} = Regolix.set_input(engine, %{"user" => "alice", "roles" => ["admin"]})
+      assert is_reference(engine)
+    end
+
+    test "handles nested data structures" do
+      {:ok, engine} = Regolix.new()
+
+      {:ok, engine} =
+        Regolix.set_input(engine, %{
+          "request" => %{
+            "method" => "GET",
+            "path" => "/api/users"
+          }
+        })
+
+      assert is_reference(engine)
+    end
+
+    test "returns error for non-encodable input" do
+      {:ok, engine} = Regolix.new()
+      # PIDs cannot be JSON encoded
+      assert {:error, %Regolix.Error{type: :json_error}} =
+               Regolix.set_input(engine, %{"pid" => self()})
+    end
+  end
+
+  describe "set_input!/2" do
+    test "returns engine directly" do
+      engine = Regolix.new!()
+      engine = Regolix.set_input!(engine, %{"user" => "bob"})
+      assert is_reference(engine)
+    end
+
+    test "raises for non-encodable input" do
+      engine = Regolix.new!()
+
+      assert_raise Regolix.Error, ~r/json_error/, fn ->
+        Regolix.set_input!(engine, %{"pid" => self()})
+      end
+    end
+  end
 end
