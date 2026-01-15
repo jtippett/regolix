@@ -157,6 +157,17 @@ fn native_get_packages(
         .map_err(|e| (atoms::engine_error(), e.to_string()))
 }
 
+#[rustler::nif]
+fn native_clear_data(resource: ResourceArc<EngineResource>) -> Result<(), (Atom, String)> {
+    let mut engine = resource
+        .engine
+        .write()
+        .map_err(|e| (atoms::engine_error(), e.to_string()))?;
+
+    engine.clear_data();
+    Ok(())
+}
+
 rustler::init!(
     "Elixir.Regolix.Native",
     [
@@ -165,6 +176,7 @@ rustler::init!(
         native_set_input,
         native_add_data,
         native_eval_query,
-        native_get_packages
+        native_get_packages,
+        native_clear_data
     ]
 );
