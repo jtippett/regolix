@@ -135,6 +135,35 @@ defmodule Regolix do
     end
   end
 
+  @doc """
+  Evaluates a Rego query against the engine.
+
+  Returns the result as Elixir terms, or `:undefined` if the query has no result.
+
+  ## Examples
+
+      {:ok, true} = Regolix.eval_query(engine, "data.authz.allow")
+      {:ok, :undefined} = Regolix.eval_query(engine, "data.authz.nonexistent")
+  """
+  @spec eval_query(engine(), String.t()) :: {:ok, eval_result()} | {:error, Error.t()}
+  def eval_query(engine, query) do
+    case Native.native_eval_query(engine, query) do
+      {:ok, result} -> {:ok, result}
+      {:error, {type, message}} -> {:error, %Error{type: type, message: message}}
+    end
+  end
+
+  @doc """
+  Evaluates a Rego query. Raises on error.
+  """
+  @spec eval_query!(engine(), String.t()) :: eval_result()
+  def eval_query!(engine, query) do
+    case eval_query(engine, query) do
+      {:ok, result} -> result
+      {:error, error} -> raise error
+    end
+  end
+
   defp encode_json(term) do
     Jason.encode(term)
   end

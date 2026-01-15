@@ -167,4 +167,108 @@ defmodule RegolixTest do
       end
     end
   end
+
+  describe "eval_query/2" do
+    test "evaluates a simple boolean rule" do
+      {:ok, engine} = Regolix.new()
+
+      {:ok, engine} =
+        Regolix.add_policy(engine, "test.rego", """
+        package test
+        default allow = false
+        allow if input.user == "admin"
+        """)
+
+      {:ok, engine} = Regolix.set_input(engine, %{"user" => "admin"})
+      assert {:ok, true} = Regolix.eval_query(engine, "data.test.allow")
+    end
+
+    test "returns false when rule doesn't match" do
+      {:ok, engine} = Regolix.new()
+
+      {:ok, engine} =
+        Regolix.add_policy(engine, "test.rego", """
+        package test
+        default allow = false
+        allow if input.user == "admin"
+        """)
+
+      {:ok, engine} = Regolix.set_input(engine, %{"user" => "guest"})
+      assert {:ok, false} = Regolix.eval_query(engine, "data.test.allow")
+    end
+
+    test "returns :undefined for non-existent rule" do
+      {:ok, engine} = Regolix.new()
+
+      {:ok, engine} =
+        Regolix.add_policy(engine, "test.rego", """
+        package test
+        """)
+
+      assert {:ok, :undefined} = Regolix.eval_query(engine, "data.test.nonexistent")
+    end
+
+    test "returns complex data structures" do
+      {:ok, engine} = Regolix.new()
+
+      {:ok, engine} =
+        Regolix.add_policy(engine, "test.rego", """
+        package test
+        user := {"name": "alice", "roles": ["admin", "user"]}
+        """)
+
+      {:ok, result} = Regolix.eval_query(engine, "data.test.user")
+      assert result["name"] == "alice"
+      assert result["roles"] == ["admin", "user"]
+    end
+
+    test "verifies set_input actually sets input" do
+      engine = Regolix.new!()
+      |> Regolix.add_policy!("test.rego", """
+        package test
+        username := input.user
+        """)
+      |> Regolix.set_input!(%{"user" => "alice"})
+
+      assert {:ok, "alice"} = Regolix.eval_query(engine, "data.test.username")
+    end
+
+    test "verifies add_data actually adds data" do
+      engine = Regolix.new!()
+      |> Regolix.add_policy!("test.rego", """
+        package test
+        admin_role := data.users.alice.role
+        """)
+      |> Regolix.add_data!(%{"users" => %{"alice" => %{"role" => "admin"}}})
+
+      assert {:ok, "admin"} = Regolix.eval_query(engine, "data.test.admin_role")
+    end
+
+    test "returns error for invalid query" do
+      {:ok, engine} = Regolix.new()
+      assert {:error, %Regolix.Error{type: :eval_error}} = Regolix.eval_query(engine, "invalid[[")
+    end
+  end
+
+  describe "eval_query!/2" do
+    test "returns result directly" do
+      {:ok, engine} = Regolix.new()
+
+      {:ok, engine} =
+        Regolix.add_policy(engine, "test.rego", """
+        package test
+        result := 42
+        """)
+
+      assert 42 = Regolix.eval_query!(engine, "data.test.result")
+    end
+
+    test "raises on error" do
+      {:ok, engine} = Regolix.new()
+
+      assert_raise Regolix.Error, ~r/eval_error/, fn ->
+        Regolix.eval_query!(engine, "invalid[[")
+      end
+    end
+  end
 end
