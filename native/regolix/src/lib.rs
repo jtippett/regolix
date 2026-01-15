@@ -64,6 +64,24 @@ fn native_set_input(
 }
 
 #[rustler::nif]
+fn native_add_data(
+    resource: ResourceArc<EngineResource>,
+    json_data: String,
+) -> Result<(), (Atom, String)> {
+    let mut engine = resource
+        .engine
+        .write()
+        .map_err(|e| (atoms::engine_error(), e.to_string()))?;
+
+    let value: regorus::Value = regorus::Value::from_json_str(&json_data)
+        .map_err(|e| (atoms::json_error(), e.to_string()))?;
+
+    engine
+        .add_data(value)
+        .map_err(|e| (atoms::engine_error(), e.to_string()))
+}
+
+#[rustler::nif]
 fn native_get_packages(
     resource: ResourceArc<EngineResource>,
 ) -> Result<Vec<String>, (Atom, String)> {
@@ -83,6 +101,7 @@ rustler::init!(
         native_new,
         native_add_policy,
         native_set_input,
+        native_add_data,
         native_get_packages
     ]
 );
