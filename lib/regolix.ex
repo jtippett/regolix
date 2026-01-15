@@ -86,9 +86,14 @@ defmodule Regolix do
          {:ok, {}} <- Native.native_set_input(engine, json) do
       {:ok, engine}
     else
-      {:error, {type, message}} -> {:error, %Error{type: type, message: message}}
-      {:error, %Jason.EncodeError{} = e} -> {:error, %Error{type: :json_error, message: Exception.message(e)}}
-      {:error, %Protocol.UndefinedError{} = e} -> {:error, %Error{type: :json_error, message: Exception.message(e)}}
+      {:error, {type, message}} ->
+        {:error, %Error{type: type, message: message}}
+
+      {:error, %Jason.EncodeError{} = e} ->
+        {:error, %Error{type: :json_error, message: Exception.message(e)}}
+
+      {:error, %Protocol.UndefinedError{} = e} ->
+        {:error, %Error{type: :json_error, message: Exception.message(e)}}
     end
   end
 
@@ -118,9 +123,14 @@ defmodule Regolix do
          {:ok, {}} <- Native.native_add_data(engine, json) do
       {:ok, engine}
     else
-      {:error, {type, message}} -> {:error, %Error{type: type, message: message}}
-      {:error, %Jason.EncodeError{} = e} -> {:error, %Error{type: :json_error, message: Exception.message(e)}}
-      {:error, %Protocol.UndefinedError{} = e} -> {:error, %Error{type: :json_error, message: Exception.message(e)}}
+      {:error, {type, message}} ->
+        {:error, %Error{type: type, message: message}}
+
+      {:error, %Jason.EncodeError{} = e} ->
+        {:error, %Error{type: :json_error, message: Exception.message(e)}}
+
+      {:error, %Protocol.UndefinedError{} = e} ->
+        {:error, %Error{type: :json_error, message: Exception.message(e)}}
     end
   end
 
