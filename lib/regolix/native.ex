@@ -22,4 +22,13 @@ defmodule Regolix.Native do
 
   @spec native_clear_data(reference()) :: {:ok, {}} | {:error, {atom(), String.t()}}
   def native_clear_data(_engine), do: :erlang.nif_error(:nif_not_loaded)
+
+  @spec native_enable_coverage(reference(), boolean()) :: {:ok, {}} | {:error, {atom(), String.t()}}
+  def native_enable_coverage(_engine, _enable), do: :erlang.nif_error(:nif_not_loaded)
+
+  @spec native_get_coverage_report(reference()) :: {:ok, map()} | {:error, {atom(), String.t()}}
+  def native_get_coverage_report(_engine), do: :erlang.nif_error(:nif_not_loaded)
+
+  @spec native_clear_coverage(reference()) :: {:ok, {}} | {:error, {atom(), String.t()}}
+  def native_clear_coverage(_engine), do: :erlang.nif_error(:nif_not_loaded)
 end

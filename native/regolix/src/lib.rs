@@ -168,6 +168,70 @@ fn native_clear_data(resource: ResourceArc<EngineResource>) -> Result<(), (Atom,
     Ok(())
 }
 
+#[rustler::nif]
+fn native_enable_coverage(
+    resource: ResourceArc<EngineResource>,
+    enable: bool,
+) -> Result<(), (Atom, String)> {
+    let mut engine = resource
+        .engine
+        .write()
+        .map_err(|e| (atoms::engine_error(), e.to_string()))?;
+
+    engine.set_enable_coverage(enable);
+    Ok(())
+}
+
+#[rustler::nif]
+fn native_get_coverage_report<'a>(
+    env: Env<'a>,
+    resource: ResourceArc<EngineResource>,
+) -> Result<Term<'a>, (Atom, String)> {
+    let engine = resource
+        .engine
+        .read()
+        .map_err(|e| (atoms::engine_error(), e.to_string()))?;
+
+    let report = engine
+        .get_coverage_report()
+        .map_err(|e| (atoms::engine_error(), e.to_string()))?;
+
+    // Convert to Elixir map: %{filename => %{covered: [...], not_covered: [...]}}
+    let mut file_reports: Vec<(Term<'a>, Term<'a>)> = Vec::new();
+
+    for file_coverage in report.files.iter() {
+        let covered: Vec<i64> = file_coverage.covered.iter().map(|&n| n as i64).collect();
+        let not_covered: Vec<i64> = file_coverage.not_covered.iter().map(|&n| n as i64).collect();
+
+        let covered_atom = rustler::Atom::from_str(env, "covered").unwrap();
+        let not_covered_atom = rustler::Atom::from_str(env, "not_covered").unwrap();
+
+        let inner_map = Term::map_from_pairs(
+            env,
+            &[
+                (covered_atom.encode(env), covered.encode(env)),
+                (not_covered_atom.encode(env), not_covered.encode(env)),
+            ],
+        )
+        .unwrap();
+
+        file_reports.push((file_coverage.path.encode(env), inner_map));
+    }
+
+    Ok(Term::map_from_pairs(env, &file_reports).unwrap())
+}
+
+#[rustler::nif]
+fn native_clear_coverage(resource: ResourceArc<EngineResource>) -> Result<(), (Atom, String)> {
+    let mut engine = resource
+        .engine
+        .write()
+        .map_err(|e| (atoms::engine_error(), e.to_string()))?;
+
+    engine.clear_coverage_data();
+    Ok(())
+}
+
 rustler::init!(
     "Elixir.Regolix.Native",
     [
@@ -177,6 +241,9 @@ rustler::init!(
         native_add_data,
         native_eval_query,
         native_get_packages,
-        native_clear_data
+        native_clear_data,
+        native_enable_coverage,
+        native_get_coverage_report,
+        native_clear_coverage
     ]
 );

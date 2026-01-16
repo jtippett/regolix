@@ -9,4 +9,4 @@ crate-type = ["cdylib"]
 
 [dependencies]
 rustler = "0.37"
-regorus = "0.5"
+regorus = { version = "0.5", features = ["coverage"] }

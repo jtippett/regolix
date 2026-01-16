@@ -9,7 +9,7 @@ Add `regolix` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:regolix, "~> 0.1.0"}
+    {:regolix, "~> 0.2.0"}
   ]
 end
 ```
@@ -77,6 +77,28 @@ packages = Regolix.get_packages(engine)
 # => ["data.authz", "data.rbac"]
 ```
 
+### Coverage Tracking
+
+Track which policy lines are executed during evaluation:
+
+```elixir
+{result, coverage} = Regolix.with_coverage(engine, fn e ->
+  Regolix.eval_query!(e, "data.authz.allow")
+end)
+
+# coverage => %{"authz.rego" => %{covered: [1, 2, 5], not_covered: [9, 10]}}
+```
+
+For multi-query accumulation, use the raw primitives:
+
+```elixir
+engine = Regolix.enable_coverage!(engine)
+Regolix.eval_query!(engine, "data.authz.allow")
+Regolix.eval_query!(engine, "data.rbac.check")
+coverage = Regolix.get_coverage_report!(engine)
+engine = Regolix.disable_coverage!(engine)
+```
+
 ## API Reference
 
 - `new/0` - Create a new policy engine
@@ -86,6 +108,11 @@ packages = Regolix.get_packages(engine)
 - `eval_query/2` - Evaluate a Rego query
 - `clear_data/1` - Clear all data (keeps policies)
 - `get_packages/1` - List loaded package names
+- `with_coverage/2` - Execute with coverage tracking
+- `enable_coverage!/1` - Start recording coverage
+- `disable_coverage!/1` - Stop recording coverage
+- `get_coverage_report/1` - Get coverage data
+- `clear_coverage!/1` - Clear coverage data
 
 All functions return `{:ok, result}` or `{:error, %Regolix.Error{}}`. Bang variants (`new!`, `add_policy!`, etc.) return the result directly or raise.
 

@@ -305,6 +305,230 @@ defmodule RegolixTest do
     end
   end
 
+  describe "enable_coverage!/1" do
+    test "enables coverage tracking and produces coverage data after query" do
+      engine =
+        Regolix.new!()
+        |> Regolix.add_policy!("test.rego", """
+        package test
+        default allow = false
+        allow if input.user == "admin"
+        """)
+        |> Regolix.enable_coverage!()
+        |> Regolix.set_input!(%{"user" => "admin"})
+
+      # Run a query to generate coverage data
+      assert {:ok, true} = Regolix.eval_query(engine, "data.test.allow")
+
+      # Verify coverage data was collected
+      # Report structure: %{"filename" => %{covered: [line_nums], not_covered: [line_nums]}}
+      {:ok, report} = Regolix.Native.native_get_coverage_report(engine)
+      assert is_map(report)
+      assert Map.has_key?(report, "test.rego")
+      file_coverage = report["test.rego"]
+      # With coverage enabled, we should have covered some lines
+      assert is_list(file_coverage.covered)
+      assert length(file_coverage.covered) > 0
+    end
+  end
+
+  describe "get_coverage_report/1" do
+    test "returns empty coverage for new engine" do
+      engine = Regolix.new!()
+      engine = Regolix.enable_coverage!(engine)
+      assert {:ok, coverage} = Regolix.get_coverage_report(engine)
+      assert coverage == %{}
+    end
+
+    test "returns coverage data after evaluation" do
+      engine =
+        Regolix.new!()
+        |> Regolix.add_policy!("test.rego", """
+        package test
+        default allow = false
+        allow if input.admin == true
+        """)
+        |> Regolix.enable_coverage!()
+        |> Regolix.set_input!(%{"admin" => true})
+
+      Regolix.eval_query!(engine, "data.test.allow")
+
+      assert {:ok, coverage} = Regolix.get_coverage_report(engine)
+      assert Map.has_key?(coverage, "test.rego")
+      assert is_list(coverage["test.rego"][:covered])
+      assert is_list(coverage["test.rego"][:not_covered])
+    end
+  end
+
+  describe "get_coverage_report!/1" do
+    test "returns coverage directly" do
+      engine =
+        Regolix.new!()
+        |> Regolix.add_policy!("test.rego", """
+        package test
+        value := 42
+        """)
+        |> Regolix.enable_coverage!()
+
+      Regolix.eval_query!(engine, "data.test.value")
+
+      coverage = Regolix.get_coverage_report!(engine)
+      assert is_map(coverage)
+    end
+  end
+
+  describe "clear_coverage!/1" do
+    test "clears accumulated coverage data" do
+      engine =
+        Regolix.new!()
+        |> Regolix.add_policy!("test.rego", """
+        package test
+        value := 42
+        """)
+        |> Regolix.enable_coverage!()
+
+      # Generate some coverage
+      Regolix.eval_query!(engine, "data.test.value")
+
+      # Verify coverage exists
+      coverage_before = Regolix.get_coverage_report!(engine)
+      assert Map.has_key?(coverage_before, "test.rego")
+
+      # Clear and verify
+      engine = Regolix.clear_coverage!(engine)
+      coverage_after = Regolix.get_coverage_report!(engine)
+
+      # After clear, coverage should be empty
+      assert coverage_after == %{}
+    end
+
+    test "keeps coverage enabled after clear" do
+      engine =
+        Regolix.new!()
+        |> Regolix.add_policy!("test.rego", """
+        package test
+        value := 42
+        """)
+        |> Regolix.enable_coverage!()
+
+      Regolix.eval_query!(engine, "data.test.value")
+      engine = Regolix.clear_coverage!(engine)
+
+      # Coverage should still be enabled, so new eval should track
+      Regolix.eval_query!(engine, "data.test.value")
+      coverage = Regolix.get_coverage_report!(engine)
+
+      assert Map.has_key?(coverage, "test.rego")
+    end
+  end
+
+  describe "disable_coverage!/1" do
+    test "disables coverage tracking so queries don't accumulate coverage" do
+      engine =
+        Regolix.new!()
+        |> Regolix.add_policy!("test.rego", """
+        package test
+        default allow = false
+        allow if input.user == "admin"
+        """)
+        |> Regolix.enable_coverage!()
+
+      # Run initial query with coverage enabled
+      engine = Regolix.set_input!(engine, %{"user" => "admin"})
+      assert {:ok, true} = Regolix.eval_query(engine, "data.test.allow")
+
+      # Clear coverage and disable tracking
+      {:ok, {}} = Regolix.Native.native_clear_coverage(engine)
+      engine = Regolix.disable_coverage!(engine)
+
+      # Run another query after disabling
+      engine = Regolix.set_input!(engine, %{"user" => "guest"})
+      assert {:ok, false} = Regolix.eval_query(engine, "data.test.allow")
+
+      # Verify no new coverage was accumulated
+      # Report should be empty (no files) since coverage was cleared and disabled
+      {:ok, report} = Regolix.Native.native_get_coverage_report(engine)
+      assert is_map(report)
+      assert map_size(report) == 0
+    end
+  end
+
+  describe "with_coverage/2" do
+    test "returns result and coverage for single query" do
+      engine =
+        Regolix.new!()
+        |> Regolix.add_policy!("authz.rego", """
+        package authz
+        default allow = false
+        allow if input.admin == true
+        """)
+        |> Regolix.set_input!(%{"admin" => true})
+
+      {result, coverage} =
+        Regolix.with_coverage(engine, fn e ->
+          Regolix.eval_query!(e, "data.authz.allow")
+        end)
+
+      assert result == true
+      assert Map.has_key?(coverage, "authz.rego")
+      assert is_list(coverage["authz.rego"][:covered])
+    end
+
+    test "propagates errors from inner function" do
+      engine = Regolix.new!()
+
+      assert_raise Regolix.Error, fn ->
+        Regolix.with_coverage(engine, fn e ->
+          Regolix.eval_query!(e, "invalid[[")
+        end)
+      end
+    end
+
+    test "cleans up coverage state after execution" do
+      engine =
+        Regolix.new!()
+        |> Regolix.add_policy!("test.rego", """
+        package test
+        value := 1
+        """)
+
+      # Run with_coverage
+      Regolix.with_coverage(engine, fn e ->
+        Regolix.eval_query!(e, "data.test.value")
+      end)
+
+      # Coverage should be disabled and cleared after with_coverage
+      # Running eval_query should not accumulate coverage
+      Regolix.eval_query!(engine, "data.test.value")
+
+      # Manually enable and check - should be empty (not accumulated from previous eval)
+      engine = Regolix.enable_coverage!(engine)
+      coverage = Regolix.get_coverage_report!(engine)
+      assert coverage == %{}
+    end
+
+    test "supports multiple queries in callback" do
+      engine =
+        Regolix.new!()
+        |> Regolix.add_policy!("multi.rego", """
+        package multi
+        a := 1
+        b := 2
+        c := 3
+        """)
+
+      {results, coverage} =
+        Regolix.with_coverage(engine, fn e ->
+          a = Regolix.eval_query!(e, "data.multi.a")
+          b = Regolix.eval_query!(e, "data.multi.b")
+          {a, b}
+        end)
+
+      assert results == {1, 2}
+      assert Map.has_key?(coverage, "multi.rego")
+    end
+  end
+
   describe "integration" do
     test "complete authorization workflow" do
       # Create engine and add policy
@@ -391,6 +615,59 @@ defmodule RegolixTest do
         |> Regolix.eval_query!("data.calc.doubled")
 
       assert result == 42
+    end
+
+    test "coverage tracks lines across multiple rules" do
+      engine =
+        Regolix.new!()
+        |> Regolix.add_policy!("rules.rego", """
+        package rules
+
+        default result = "none"
+        result = "admin" if input.role == "admin"
+        result = "user" if input.role == "user"
+        result = "guest" if input.role == "guest"
+        """)
+        |> Regolix.set_input!(%{"role" => "admin"})
+
+      {result, coverage} =
+        Regolix.with_coverage(engine, fn e ->
+          Regolix.eval_query!(e, "data.rules.result")
+        end)
+
+      assert result == "admin"
+      assert Map.has_key?(coverage, "rules.rego")
+      # The admin rule line should be covered
+      assert length(coverage["rules.rego"][:covered]) > 0
+    end
+
+    test "multi-query accumulation with raw primitives" do
+      engine =
+        Regolix.new!()
+        |> Regolix.add_policy!("authz.rego", """
+        package authz
+        allow if input.method == "GET"
+        """)
+        |> Regolix.add_policy!("rbac.rego", """
+        package rbac
+        check if input.user == "admin"
+        """)
+        |> Regolix.enable_coverage!()
+
+      # First query
+      engine = Regolix.set_input!(engine, %{"method" => "GET"})
+      Regolix.eval_query!(engine, "data.authz.allow")
+
+      # Second query (coverage accumulates)
+      engine = Regolix.set_input!(engine, %{"user" => "admin"})
+      Regolix.eval_query!(engine, "data.rbac.check")
+
+      coverage = Regolix.get_coverage_report!(engine)
+      _engine = Regolix.disable_coverage!(engine)
+
+      # Both files should have coverage
+      assert Map.has_key?(coverage, "authz.rego")
+      assert Map.has_key?(coverage, "rbac.rego")
     end
   end
 end
