@@ -232,18 +232,4 @@ fn native_clear_coverage(resource: ResourceArc<EngineResource>) -> Result<(), (A
     Ok(())
 }
 
-rustler::init!(
-    "Elixir.Regolix.Native",
-    [
-        native_new,
-        native_add_policy,
-        native_set_input,
-        native_add_data,
-        native_eval_query,
-        native_get_packages,
-        native_clear_data,
-        native_enable_coverage,
-        native_get_coverage_report,
-        native_clear_coverage
-    ]
-);
+rustler::init!("Elixir.Regolix.Native");
