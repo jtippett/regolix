@@ -348,6 +348,48 @@ defmodule Regolix do
     end
   end
 
+  @type rule_info :: %{
+          name: String.t(),
+          description: String.t(),
+          start_line: pos_integer(),
+          end_line: pos_integer()
+        }
+
+  @doc """
+  Returns metadata about rules defined in loaded policies.
+
+  Parses the policy sources to extract rule names, descriptions (from comments),
+  and line ranges. Useful for mapping coverage line numbers to human-readable rule names.
+
+  ## Examples
+
+      rules = Regolix.get_rules(engine)
+      # => %{
+      #   "policy.rego" => [
+      #     %{name: "allow", description: "Allow if not denied", start_line: 10, end_line: 15},
+      #     %{name: "deny", description: "Deny sanctioned countries", start_line: 20, end_line: 25}
+      #   ]
+      # }
+  """
+  @spec get_rules(engine()) :: {:ok, %{String.t() => [rule_info()]}} | {:error, Error.t()}
+  def get_rules(engine) do
+    case Native.native_get_rules(engine) do
+      {:ok, rules} -> {:ok, rules}
+      {:error, {type, message}} -> {:error, %Error{type: type, message: message}}
+    end
+  end
+
+  @doc """
+  Returns metadata about rules defined in loaded policies. Raises on error.
+  """
+  @spec get_rules!(engine()) :: %{String.t() => [rule_info()]}
+  def get_rules!(engine) do
+    case get_rules(engine) do
+      {:ok, rules} -> rules
+      {:error, error} -> raise error
+    end
+  end
+
   defp encode_json(term) do
     Jason.encode(term)
   end

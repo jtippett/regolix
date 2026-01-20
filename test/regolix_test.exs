@@ -529,6 +529,149 @@ defmodule RegolixTest do
     end
   end
 
+  describe "get_rules/1" do
+    test "returns empty map for engine with no policies" do
+      engine = Regolix.new!()
+      assert {:ok, rules} = Regolix.get_rules(engine)
+      assert rules == %{}
+    end
+
+    test "extracts rule names from simple policy" do
+      engine =
+        Regolix.new!()
+        |> Regolix.add_policy!("test.rego", """
+        package test
+        default allow = false
+        allow if input.admin == true
+        """)
+
+      {:ok, rules} = Regolix.get_rules(engine)
+      assert Map.has_key?(rules, "test.rego")
+
+      rule_names = Enum.map(rules["test.rego"], & &1[:name])
+      assert "allow" in rule_names
+    end
+
+    test "extracts rules with := assignment" do
+      engine =
+        Regolix.new!()
+        |> Regolix.add_policy!("test.rego", """
+        package test
+        value := 42
+        result := input.x * 2
+        """)
+
+      {:ok, rules} = Regolix.get_rules(engine)
+      rule_names = Enum.map(rules["test.rego"], & &1[:name])
+      assert "value" in rule_names
+      assert "result" in rule_names
+    end
+
+    test "extracts rules with = assignment" do
+      engine =
+        Regolix.new!()
+        |> Regolix.add_policy!("test.rego", """
+        package test
+        value = 42
+        result = "hello"
+        """)
+
+      {:ok, rules} = Regolix.get_rules(engine)
+      rule_names = Enum.map(rules["test.rego"], & &1[:name])
+      assert "value" in rule_names
+      assert "result" in rule_names
+    end
+
+    test "extracts multi-line rules with correct line ranges" do
+      engine =
+        Regolix.new!()
+        |> Regolix.add_policy!("test.rego", """
+        package test
+
+        allow if {
+          input.method == "GET"
+          input.path == "/public"
+        }
+        """)
+
+      {:ok, rules} = Regolix.get_rules(engine)
+      allow_rule = Enum.find(rules["test.rego"], &(&1[:name] == "allow"))
+
+      assert allow_rule[:start_line] == 3
+      assert allow_rule[:end_line] == 6
+    end
+
+    test "extracts description from preceding comment" do
+      engine =
+        Regolix.new!()
+        |> Regolix.add_policy!("test.rego", """
+        package test
+
+        # Allow admin users full access
+        allow if input.role == "admin"
+        """)
+
+      {:ok, rules} = Regolix.get_rules(engine)
+      allow_rule = Enum.find(rules["test.rego"], &(&1[:name] == "allow"))
+
+      assert allow_rule[:description] == "Allow admin users full access"
+    end
+
+    test "handles multiple policies" do
+      engine =
+        Regolix.new!()
+        |> Regolix.add_policy!("authz.rego", """
+        package authz
+        allow if input.admin
+        """)
+        |> Regolix.add_policy!("rbac.rego", """
+        package rbac
+        check if input.user
+        """)
+
+      {:ok, rules} = Regolix.get_rules(engine)
+
+      assert Map.has_key?(rules, "authz.rego")
+      assert Map.has_key?(rules, "rbac.rego")
+
+      authz_rule_names = Enum.map(rules["authz.rego"], & &1[:name])
+      rbac_rule_names = Enum.map(rules["rbac.rego"], & &1[:name])
+
+      assert "allow" in authz_rule_names
+      assert "check" in rbac_rule_names
+    end
+
+    test "handles contains rules" do
+      engine =
+        Regolix.new!()
+        |> Regolix.add_policy!("test.rego", """
+        package test
+        errors contains msg if {
+          msg := "error"
+        }
+        """)
+
+      {:ok, rules} = Regolix.get_rules(engine)
+      rule_names = Enum.map(rules["test.rego"], & &1[:name])
+      assert "errors" in rule_names
+    end
+  end
+
+  describe "get_rules!/1" do
+    test "returns rules directly" do
+      engine =
+        Regolix.new!()
+        |> Regolix.add_policy!("test.rego", """
+        package test
+        value := 1
+        """)
+
+      rules = Regolix.get_rules!(engine)
+      assert is_map(rules)
+      assert Map.has_key?(rules, "test.rego")
+    end
+  end
+
   describe "integration" do
     test "complete authorization workflow" do
       # Create engine and add policy
