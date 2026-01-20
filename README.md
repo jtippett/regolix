@@ -9,7 +9,7 @@ Add `regolix` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:regolix, "~> 0.2.0"}
+    {:regolix, "~> 0.3.0"}
   ]
 end
 ```
@@ -77,6 +77,19 @@ packages = Regolix.get_packages(engine)
 # => ["data.authz", "data.rbac"]
 ```
 
+Get metadata about rules defined in policies:
+
+```elixir
+{:ok, rules} = Regolix.get_rules(engine)
+# => %{
+#   "authz.rego" => [
+#     %{name: "allow", description: "Allow admin users", start_line: 5, end_line: 8}
+#   ]
+# }
+```
+
+This is useful for mapping coverage line numbers to human-readable rule names.
+
 ### Coverage Tracking
 
 Track which policy lines are executed during evaluation:
@@ -108,6 +121,7 @@ engine = Regolix.disable_coverage!(engine)
 - `eval_query/2` - Evaluate a Rego query
 - `clear_data/1` - Clear all data (keeps policies)
 - `get_packages/1` - List loaded package names
+- `get_rules/1` - Get rule metadata (names, descriptions, line ranges)
 - `with_coverage/2` - Execute with coverage tracking
 - `enable_coverage!/1` - Start recording coverage
 - `disable_coverage!/1` - Stop recording coverage
