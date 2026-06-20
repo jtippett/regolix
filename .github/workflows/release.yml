@@ -1,0 +1,134 @@
+name: Build precompiled NIFs
+
+# Push a tag (v0.4.0, ...) to: build NIFs for every target, attach them to a
+# GitHub release, generate the checksum file from those artifacts, and publish
+# to Hex. The `publish` job is gated by the `hex` environment, so it pauses for
+# a required-reviewer approval before anything ships. See the README "Releasing".
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: NIF ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            os: macos-latest
+          - target: x86_64-apple-darwin
+            os: macos-latest
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+          # Native arm64 runner avoids cross-compilation pain for the Rust deps.
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-24.04-arm
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: .
+
+      # The crate is a member of the root Cargo workspace, so build from the
+      # repo root; output lands in the shared target/ dir.
+      - name: Build NIF
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Package NIF
+        id: package
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          TARGET="${{ matrix.target }}"
+          # NIF ABI version 2.15 — keep in sync with the rustler version used.
+          NIF_NAME="libregolix-v${VERSION}-nif-2.15-${TARGET}.so"
+
+          if [[ "$TARGET" == *"apple"* ]]; then
+            SRC="target/${TARGET}/release/libregolix.dylib"
+          else
+            SRC="target/${TARGET}/release/libregolix.so"
+          fi
+
+          cp "$SRC" "${NIF_NAME}"
+          tar -czf "${NIF_NAME}.tar.gz" "${NIF_NAME}"
+          echo "archive=${NIF_NAME}.tar.gz" >> "$GITHUB_OUTPUT"
+
+      - name: Upload NIF artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nif-${{ matrix.target }}
+          path: ${{ steps.package.outputs.archive }}
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: nif-*
+          merge-multiple: true
+          path: artifacts
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*.tar.gz
+
+  # Generates the precompiled-NIF checksum file from the artifacts just attached
+  # to the GitHub release, then publishes to Hex. Gated by the `hex` environment:
+  # GitHub pauses here for a required reviewer to approve, so you still eyeball
+  # the release before anything ships. No manual checksum commit, no re-tag.
+  publish:
+    name: Publish to Hex
+    needs: release
+    runs-on: ubuntu-latest
+    environment: hex
+    env:
+      # Build the NIF locally so `mix compile` doesn't try to download a NIF
+      # whose checksum isn't generated yet (the classic chicken-and-egg).
+      REGOLIX_BUILD: "1"
+      HEX_API_KEY: ${{ secrets.HEX_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          otp-version: "27.2"
+          elixir-version: "1.18.0"
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Fetch dependencies
+        run: mix deps.get
+
+      - name: Generate checksums from the released artifacts
+        # Downloads each target's NIF from the GitHub release created above and
+        # writes checksum-Elixir.Regolix.Native.exs — the canonical way, so the
+        # format always matches what rustler_precompiled expects at fetch time.
+        run: mix rustler_precompiled.download Regolix.Native --all --print
+
+      - name: Publish package to Hex
+        run: mix hex.publish package --yes
+
+      - name: Publish docs to HexDocs
+        continue-on-error: true
+        run: mix hex.publish docs --yes

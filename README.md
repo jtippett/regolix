@@ -14,6 +14,11 @@ def deps do
 end
 ```
 
+A precompiled NIF is downloaded for your platform — **no Rust toolchain required**
+to use the library. Supported targets: `{x86_64,aarch64}-apple-darwin` and
+`{x86_64,aarch64}-unknown-linux-gnu`. To build from source instead, set
+`REGOLIX_BUILD=1` before compiling.
+
 ## Usage
 
 ```elixir
@@ -148,6 +153,40 @@ allow if {
   input.method == "GET"
 }
 ```
+
+## Releasing
+
+Releases are automated. Pushing a `vX.Y.Z` tag builds the precompiled NIFs,
+creates a GitHub release, and publishes to Hex — **pausing for a manual approval
+before anything ships**. You never hand-build checksums or re-tag.
+
+**One-time setup.** Hex no longer mints API keys from the CLI (auth is OAuth);
+generate one at [hex.pm/dashboard/keys](https://hex.pm/dashboard/keys) with the
+`api` permission, then store it scoped to the `hex` environment:
+
+```bash
+gh secret set HEX_API_KEY --env hex --repo jtippett/regolix
+```
+
+**To cut a release:**
+
+1. Bump `@version` in `mix.exs`; move the `CHANGELOG.md` `[Unreleased]` section
+   under the new version number. (The first precompiled release must be a new
+   version — `0.3.0` is already on Hex as a source build.)
+2. Open a PR and merge to `master` once CI is green.
+3. Tag the merge commit and push the tag:
+   ```bash
+   git tag -a vX.Y.Z -m vX.Y.Z && git push origin vX.Y.Z
+   ```
+4. `release.yml` builds NIFs for all four targets, creates the GitHub release
+   with the `.tar.gz` artifacts, then **waits for approval**.
+5. Review the release, then approve the **`hex`** deployment in the workflow run
+   (Actions → the run → *Review deployments* → approve). On approval it
+   generates `checksum-Elixir.Regolix.Native.exs` from the released artifacts and
+   runs `mix hex.publish`.
+
+Don't commit the checksum file or move a published tag by hand — the pipeline
+owns both.
 
 ## License
 
