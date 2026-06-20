@@ -211,7 +211,11 @@ fn native_get_coverage_report<'a>(
 
     for file_coverage in report.files.iter() {
         let covered: Vec<i64> = file_coverage.covered.iter().map(|&n| n as i64).collect();
-        let not_covered: Vec<i64> = file_coverage.not_covered.iter().map(|&n| n as i64).collect();
+        let not_covered: Vec<i64> = file_coverage
+            .not_covered
+            .iter()
+            .map(|&n| n as i64)
+            .collect();
 
         let covered_atom = rustler::Atom::from_str(env, "covered").unwrap();
         let not_covered_atom = rustler::Atom::from_str(env, "not_covered").unwrap();
@@ -266,7 +270,10 @@ fn parse_rules(source: &str) -> Vec<RuleInfo> {
         if line.starts_with('#') {
             // Skip section dividers (lines of === or ---)
             let comment_text = line.trim_start_matches('#').trim();
-            if !comment_text.chars().all(|c| c == '=' || c == '-' || c.is_whitespace()) {
+            if !comment_text
+                .chars()
+                .all(|c| c == '=' || c == '-' || c.is_whitespace())
+            {
                 pending_comments.push(comment_text.to_string());
             }
             i += 1;
@@ -324,7 +331,8 @@ fn extract_rule_name(line: &str) -> Option<String> {
     // default name := value
     if line.starts_with("default ") {
         let rest = line.strip_prefix("default ")?.trim();
-        let name = rest.split(|c: char| !c.is_alphanumeric() && c != '_')
+        let name = rest
+            .split(|c: char| !c.is_alphanumeric() && c != '_')
             .next()?;
         return Some(name.to_string());
     }
@@ -360,8 +368,12 @@ fn extract_rule_name(line: &str) -> Option<String> {
     // Check what follows
     let rest: String = chars.collect();
 
-    if rest.starts_with(":=") || rest.starts_with("=") || rest.starts_with("if ") || rest.starts_with("if{") ||
-       rest.starts_with("contains ") {
+    if rest.starts_with(":=")
+        || rest.starts_with("=")
+        || rest.starts_with("if ")
+        || rest.starts_with("if{")
+        || rest.starts_with("contains ")
+    {
         Some(name)
     } else {
         None

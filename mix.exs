@@ -26,9 +26,10 @@ defmodule Regolix.MixProject do
 
   defp deps do
     [
-      {:rustler, "~> 0.37.1"},
+      {:rustler, "~> 0.38", optional: true},
+      {:rustler_precompiled, "~> 0.9"},
       {:jason, "~> 1.4"},
-      {:ex_doc, "~> 0.31", only: :dev, runtime: false}
+      {:ex_doc, "~> 0.40", only: :dev, runtime: false}
     ]
   end
 
@@ -44,7 +45,8 @@ defmodule Regolix.MixProject do
         "GitHub" => @source_url,
         "Regorus" => "https://github.com/microsoft/regorus"
       },
-      files: ~w(lib native .formatter.exs mix.exs README.md LICENSE)
+      files:
+        ~w(lib native checksum-Elixir.Regolix.Native.exs .formatter.exs mix.exs README.md CHANGELOG.md LICENSE)
     ]
   end
 
@@ -53,7 +55,7 @@ defmodule Regolix.MixProject do
       main: "readme",
       source_ref: "v#{@version}",
       source_url: @source_url,
-      extras: ["README.md"]
+      extras: ["README.md", "CHANGELOG.md"]
     ]
   end
 end

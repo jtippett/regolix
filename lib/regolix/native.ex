@@ -1,5 +1,20 @@
 defmodule Regolix.Native do
-  use Rustler, otp_app: :regolix, crate: "regolix"
+  @version Mix.Project.config()[:version]
+
+  use RustlerPrecompiled,
+    otp_app: :regolix,
+    crate: "regolix",
+    base_url: "https://github.com/jtippett/regolix/releases/download/v#{@version}",
+    version: @version,
+    targets: ~w(
+      aarch64-apple-darwin
+      x86_64-apple-darwin
+      x86_64-unknown-linux-gnu
+      aarch64-unknown-linux-gnu
+    ),
+    # Build from source instead of downloading a precompiled NIF when
+    # REGOLIX_BUILD=1 (local dev / CI). Requires a Rust toolchain.
+    force_build: System.get_env("REGOLIX_BUILD") in ["1", "true"]
 
   @spec native_new() :: reference()
   def native_new(), do: :erlang.nif_error(:nif_not_loaded)
@@ -23,7 +38,8 @@ defmodule Regolix.Native do
   @spec native_clear_data(reference()) :: {:ok, {}} | {:error, {atom(), String.t()}}
   def native_clear_data(_engine), do: :erlang.nif_error(:nif_not_loaded)
 
-  @spec native_enable_coverage(reference(), boolean()) :: {:ok, {}} | {:error, {atom(), String.t()}}
+  @spec native_enable_coverage(reference(), boolean()) ::
+          {:ok, {}} | {:error, {atom(), String.t()}}
   def native_enable_coverage(_engine, _enable), do: :erlang.nif_error(:nif_not_loaded)
 
   @spec native_get_coverage_report(reference()) :: {:ok, map()} | {:error, {atom(), String.t()}}
