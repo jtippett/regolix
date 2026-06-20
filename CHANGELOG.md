@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## 0.3.1 - 2026-06-20
+
 ### Changed
 
 - **Ship precompiled NIFs.** Switched from `Rustler` (compile-from-source on the
