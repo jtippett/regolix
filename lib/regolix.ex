@@ -36,7 +36,9 @@ defmodule Regolix do
   @type engine :: reference()
   @type json_encodable :: map() | list() | String.t() | number() | boolean() | nil
   @type eval_result :: json_encodable() | :undefined
-  @type coverage_report :: %{String.t() => %{covered: [pos_integer()], not_covered: [pos_integer()]}}
+  @type coverage_report :: %{
+          String.t() => %{covered: [pos_integer()], not_covered: [pos_integer()]}
+        }
 
   @doc """
   Creates a new Rego policy engine.
